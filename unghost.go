@@ -102,7 +102,6 @@ func (c *heartbeatTCP) Close() error {
 	c.closeOnce.Do(func() {
 
 		c.Conn.Close()
-		close(c.tcpDataCh)
 		c.flowControlData.flowDataLock.Lock()
 		c.flowControlData.isClosed = true
 		c.flowControlData.sndNotifyCond.Broadcast()

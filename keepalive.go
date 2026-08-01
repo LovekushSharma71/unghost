@@ -15,6 +15,7 @@ const (
 
 func (c *heartbeatTCP) keepAliveReciever() {
 
+	defer close(c.tcpDataCh)
 	headerBuf := make([]byte, HEADERLENGTH)
 
 	for {
@@ -54,7 +55,11 @@ func (c *heartbeatTCP) keepAliveReciever() {
 		}
 
 		if flag == FlagPing || flag == FlagPong {
-			c.heartbeatCh <- flag
+			select {
+			case c.heartbeatCh <- flag:
+			default:
+				// Safely drop the heartbeat if the manager is dead or blocked, and no other goroutine will write on it so it should be safe
+			}
 		} else if flag == FlagUserData {
 			if datalength > ChunkSizeDefault {
 				fmt.Printf("keepAliveReciever: protocol voilation Invalid packet size: 0x%02x should not exceede 0x%02x\n", datalength, ChunkSizeDefault)
@@ -69,7 +74,7 @@ func (c *heartbeatTCP) keepAliveReciever() {
 				b := getBufData().([]byte)
 				n, err := io.ReadFull(c.Conn, b[:datalength])
 				// not locking cause concurrent read is prevented by channel
-				c.tcpDataCh <- tcpReadData{msg: b, len: n - len(headerBuf), err: err}
+				c.tcpDataCh <- tcpReadData{msg: b, len: n, err: err}
 			}
 		} else {
 			fmt.Printf("keepAliveReciever: Unknown flag: 0x%02x\n", flag)
