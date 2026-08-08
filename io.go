@@ -6,7 +6,7 @@ import (
 	"net"
 )
 
-func (c *heartbeatTCP) Read(b []byte) (int, error) {
+func (c *HeartbeatTCP) Read(b []byte) (int, error) {
 
 	// If we have leftovers from a previous read, use them first
 	c.tcpReadLock.Lock()
@@ -39,7 +39,7 @@ func (c *heartbeatTCP) Read(b []byte) (int, error) {
 	c.addProcessedCredit()
 	c.flowControlData.flowDataLock.Unlock()
 
-	if float64(c.flowControlData.processedCredits) >= 0.25*float64(MaxWindowSize) {
+	if float64(c.flowControlData.processedCredits) >= 0.25*float64(c.flowControlData.maxWindowSize) {
 		select {
 		case c.flowControlData.processedCreditsNotifyCh <- struct{}{}:
 		default:
@@ -48,20 +48,20 @@ func (c *heartbeatTCP) Read(b []byte) (int, error) {
 	}
 
 	if tcpMsg.msg != nil {
-		putBufData(tcpMsg.msg)
+		c.putBufData(tcpMsg.msg)
 	}
 	return copiedCount, tcpMsg.err
 
 }
 
-func (c *heartbeatTCP) Write(b []byte) (int, error) {
+func (c *HeartbeatTCP) Write(b []byte) (int, error) {
 
 	c.streamLock.Lock()
 	defer c.streamLock.Unlock()
 
 	ptr := 0
 
-	maxPayloadSize := int(ChunkSizeDefault) - 9
+	maxPayloadSize := int(c.flowControlData.chunkSize) - 9
 	for ptr < len(b) {
 
 		c.flowControlData.flowDataLock.Lock()
@@ -103,8 +103,8 @@ func (c *heartbeatTCP) Write(b []byte) (int, error) {
 		c.flowControlData.flowDataLock.Lock()
 		if err != nil {
 
-			c.refundCredits(ChunkSizeDefault)
-			c.flowControlData.processedCredits += ChunkSizeDefault
+			c.refundCredits(c.flowControlData.chunkSize)
+			c.flowControlData.processedCredits += c.flowControlData.chunkSize
 		}
 		c.flowControlData.flowDataLock.Unlock()
 		syncpoolHeader.Put(header)

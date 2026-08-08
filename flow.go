@@ -32,6 +32,10 @@ type flowControlData struct {
 	processedCreditsNotifyCh chan struct{}
 
 	flowDataLock sync.Mutex
+
+	chunkSize uint32
+
+	maxWindowSize uint32
 }
 
 // sender and reciever will consume a discrete amount of credits no matter how small datalength sent
@@ -40,10 +44,10 @@ type flowControlData struct {
 // Contains assuming this is always in mutex with send or recive to safely deduct credits.
 // cause i need to check credits before sending and recieving.
 // sender will always consume or free credit
-func (c *heartbeatTCP) consumeCredits() {
+func (c *HeartbeatTCP) consumeCredits() {
 
-	if c.flowControlData.sendCredits >= ChunkSizeDefault {
-		c.flowControlData.sendCredits = c.flowControlData.sendCredits - ChunkSizeDefault
+	if c.flowControlData.sendCredits >= c.flowControlData.chunkSize {
+		c.flowControlData.sendCredits = c.flowControlData.sendCredits - c.flowControlData.chunkSize
 	} else {
 		c.flowControlData.sendCredits = 0
 	}
@@ -51,14 +55,14 @@ func (c *heartbeatTCP) consumeCredits() {
 }
 
 // atomically update window size on getting packet from reciever or when read operation is finished.
-func (c *heartbeatTCP) refundCredits(size uint32) {
+func (c *HeartbeatTCP) refundCredits(size uint32) {
 
-	c.flowControlData.sendCredits = min(MaxWindowSize, c.flowControlData.sendCredits+size)
+	c.flowControlData.sendCredits = min(c.flowControlData.maxWindowSize, c.flowControlData.sendCredits+size)
 }
 
 // should not logically go above max size
 // will only increase
-func (c *heartbeatTCP) addProcessedCredit() {
+func (c *HeartbeatTCP) addProcessedCredit() {
 
-	c.flowControlData.processedCredits = min(MaxWindowSize, c.flowControlData.processedCredits+ChunkSizeDefault)
+	c.flowControlData.processedCredits = min(c.flowControlData.maxWindowSize, c.flowControlData.processedCredits+c.flowControlData.chunkSize)
 }

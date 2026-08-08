@@ -13,7 +13,7 @@ const (
 	defaultKeepAliveTimeout  time.Duration = 5 * time.Minute
 )
 
-func (c *heartbeatTCP) keepAliveReciever() {
+func (c *HeartbeatTCP) keepAliveReciever() {
 
 	defer close(c.tcpDataCh)
 	headerBuf := make([]byte, HEADERLENGTH)
@@ -50,7 +50,7 @@ func (c *heartbeatTCP) keepAliveReciever() {
 		c.flowControlData.flowDataLock.Unlock()
 
 		// just for safety as checking using 0 will do the same
-		if c.flowControlData.sendCredits >= ChunkSizeDefault {
+		if c.flowControlData.sendCredits >= c.flowControlData.chunkSize {
 			c.flowControlData.sndNotifyCond.Broadcast()
 		}
 
@@ -61,8 +61,8 @@ func (c *heartbeatTCP) keepAliveReciever() {
 				// Safely drop the heartbeat if the manager is dead or blocked, and no other goroutine will write on it so it should be safe
 			}
 		} else if flag == FlagUserData {
-			if datalength > ChunkSizeDefault {
-				fmt.Printf("keepAliveReciever: protocol voilation Invalid packet size: 0x%02x should not exceede 0x%02x\n", datalength, ChunkSizeDefault)
+			if datalength > c.flowControlData.chunkSize {
+				fmt.Printf("keepAliveReciever: protocol voilation Invalid packet size: 0x%02x should not exceede 0x%02x\n", datalength, c.flowControlData.chunkSize)
 				c.tcpDataCh <- tcpReadData{msg: []byte{}, len: 0, err: errors.ErrUnsupported}
 				select {
 				case c.closeCh <- struct{}{}:
@@ -71,7 +71,7 @@ func (c *heartbeatTCP) keepAliveReciever() {
 				return
 			} else {
 				// as one packet will always have data less than equal default chunk size
-				b := getBufData().([]byte)
+				b := c.getBufData().([]byte)
 				n, err := io.ReadFull(c.Conn, b[:datalength])
 				// not locking cause concurrent read is prevented by channel
 				c.tcpDataCh <- tcpReadData{msg: b, len: n, err: err}
@@ -84,7 +84,7 @@ func (c *heartbeatTCP) keepAliveReciever() {
 	}
 }
 
-func (c *heartbeatTCP) keepAliveSender(heartbeatFlag byte) error {
+func (c *HeartbeatTCP) keepAliveSender(heartbeatFlag byte) error {
 
 	buff := getBufHeader().([]byte)
 	defer putBufHeader(buff)
@@ -125,7 +125,7 @@ func (c *heartbeatTCP) keepAliveSender(heartbeatFlag byte) error {
 	return err
 }
 
-func (c *heartbeatTCP) keepaliveManager() {
+func (c *HeartbeatTCP) keepaliveManager() {
 	ticker := time.NewTicker(c.config.KeepAliveInterval)
 	defer ticker.Stop()
 	for {

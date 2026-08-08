@@ -2,20 +2,19 @@ package unghost
 
 import "sync"
 
-// create a buffer of size chunkSizeDefault
-// should i keep length 0?
-var syncpoolData = sync.Pool{
-	New: func() any {
-		return make([]byte, ChunkSizeDefault)
-	},
+// // create a buffer of size chunkSizeDefault
+// var syncpoolData = sync.Pool{
+// 	New: func() any {
+// 		return make([]byte, ChunkSizeDefault)
+// 	},
+// }
+
+func (c *HeartbeatTCP) getBufData() any {
+	return c.datapool.Get()
 }
 
-func getBufData() any {
-	return syncpoolData.Get()
-}
-
-func putBufData(buf any) {
-	syncpoolData.Put(buf)
+func (c *HeartbeatTCP) putBufData(buf any) {
+	c.datapool.Put(buf)
 }
 
 var syncpoolHeader = sync.Pool{

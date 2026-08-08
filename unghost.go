@@ -21,7 +21,7 @@ type KeepAliveConfig struct {
 	KeepAliveTimeout time.Duration
 }
 
-type heartbeatTCP struct {
+type HeartbeatTCP struct {
 	net.Conn
 
 	streamLock sync.Mutex
@@ -52,9 +52,12 @@ type heartbeatTCP struct {
 
 	// rn using general lock but for better readability will make is more specific in future like close lock or ping pong lock can also have sync atomic based on need
 	writeLock sync.Mutex
+
+	// sync pool for each connection
+	datapool *sync.Pool
 }
 
-func Wrap(c net.Conn, config KeepAliveConfig) (*heartbeatTCP, error) {
+func Wrap(c net.Conn, config KeepAliveConfig, maxWindowSize uint32, chunkSize uint32) (*HeartbeatTCP, error) {
 
 	if c == nil {
 		fmt.Println("wrap error: connection cannot be nil")
@@ -67,24 +70,40 @@ func Wrap(c net.Conn, config KeepAliveConfig) (*heartbeatTCP, error) {
 		config.KeepAliveTimeout = defaultKeepAliveTimeout
 	}
 
-	htc := heartbeatTCP{
+	if maxWindowSize == 0 {
+		maxWindowSize = MaxWindowSize
+	}
+	if chunkSize == 0 {
+		chunkSize = ChunkSizeDefault
+	}
+
+	var syncpool = sync.Pool{
+		New: func() any {
+			return make([]byte, chunkSize)
+		},
+	}
+
+	htc := HeartbeatTCP{
 		Conn: c,
 		config: KeepAliveConfig{
 			KeepAliveInterval: config.KeepAliveInterval,
 			KeepAliveTimeout:  config.KeepAliveTimeout,
 		},
 		flowControlData: flowControlData{
-			sendCredits:              MaxWindowSize,
+			sendCredits:              maxWindowSize,
 			processedCredits:         0,
 			processedCreditsNotifyCh: make(chan struct{}, 1),
 			flowDataLock:             sync.Mutex{},
+			chunkSize:                chunkSize,
+			maxWindowSize:            maxWindowSize,
 		},
 		tcpReadLock:     sync.Mutex{},
-		tcpLeftOverData: make([]byte, 0, MaxWindowSize),
+		tcpLeftOverData: make([]byte, 0, maxWindowSize),
 		tcpDataCh:       make(chan tcpReadData, 1024),
 		heartbeatCh:     make(chan byte),
 		closeCh:         make(chan struct{}, 1),
 		writeLock:       sync.Mutex{},
+		datapool:        &syncpool,
 	}
 
 	htc.flowControlData.sndNotifyCond = sync.NewCond(&htc.flowControlData.flowDataLock)
@@ -97,7 +116,7 @@ func Wrap(c net.Conn, config KeepAliveConfig) (*heartbeatTCP, error) {
 }
 
 // add sync once for better logic
-func (c *heartbeatTCP) Close() error {
+func (c *HeartbeatTCP) Close() error {
 
 	c.closeOnce.Do(func() {
 
@@ -110,4 +129,18 @@ func (c *heartbeatTCP) Close() error {
 	})
 
 	return nil
+}
+
+var ErrDeadlinesDisabled = errors.New("unghost: deadlines are managed internally by keep-alive")
+
+func (c *HeartbeatTCP) SetDeadline(t time.Time) error {
+	return ErrDeadlinesDisabled
+}
+
+func (c *HeartbeatTCP) SetReadDeadline(t time.Time) error {
+	return ErrDeadlinesDisabled
+}
+
+func (c *HeartbeatTCP) SetWriteDeadline(t time.Time) error {
+	return ErrDeadlinesDisabled
 }
