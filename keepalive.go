@@ -62,8 +62,8 @@ func (c *HeartbeatTCP) keepAliveReciever() {
 			}
 		} else if flag == FlagUserData {
 			if datalength > c.flowControlData.chunkSize {
-				fmt.Printf("keepAliveReciever: protocol voilation Invalid packet size: 0x%02x should not exceede 0x%02x\n", datalength, c.flowControlData.chunkSize)
-				c.tcpDataCh <- tcpReadData{msg: []byte{}, len: 0, err: errors.ErrUnsupported}
+				// fmt.Printf("keepAliveReciever: protocol voilation Invalid packet size: 0x%02x should not exceede 0x%02x\n", datalength, c.flowControlData.chunkSize)
+				c.tcpDataCh <- tcpReadData{msg: []byte{}, len: 0, err: ErrPacketTooLarge}
 				select {
 				case c.closeCh <- struct{}{}:
 				default:
@@ -77,7 +77,15 @@ func (c *HeartbeatTCP) keepAliveReciever() {
 				c.tcpDataCh <- tcpReadData{msg: b, len: n, err: err}
 			}
 		} else {
-			fmt.Printf("keepAliveReciever: Unknown flag: 0x%02x\n", flag)
+			//close connection due to safety
+			c.tcpDataCh <- tcpReadData{err: fmt.Errorf("%w: 0x%02x", ErrUnknownFlag, flag)}
+			// fmt.Printf("keepAliveReciever: Unknown flag: 0x%02x\n", flag)
+			select {
+			case c.closeCh <- struct{}{}:
+			default:
+			}
+			return
+
 		}
 		c.Conn.SetDeadline(time.Now().Add(c.config.KeepAliveTimeout))
 
@@ -90,8 +98,8 @@ func (c *HeartbeatTCP) keepAliveSender(heartbeatFlag byte) error {
 	defer putBufHeader(buff)
 
 	if !(heartbeatFlag == FlagPing || heartbeatFlag == FlagPong) {
-		fmt.Println("keepalive error: cannot send non heartbeat data")
-		return errors.ErrUnsupported
+		// fmt.Println("keepalive error: cannot send non heartbeat data")
+		return ErrInvalidHeartbeat
 	}
 
 	// write for heartbeat
@@ -114,7 +122,7 @@ func (c *HeartbeatTCP) keepAliveSender(heartbeatFlag byte) error {
 	c.flowControlData.flowDataLock.Unlock()
 
 	if errors.As(err, &netErr) && netErr.Timeout() {
-		fmt.Println("timeout error:", err)
+		// fmt.Println("timeout error:", err)
 		select {
 		case c.closeCh <- struct{}{}:
 		default:
@@ -122,7 +130,10 @@ func (c *HeartbeatTCP) keepAliveSender(heartbeatFlag byte) error {
 
 	}
 
-	return err
+	if err != nil {
+		return fmt.Errorf("unghost keepalive write failed: %w", err)
+	}
+	return nil
 }
 
 func (c *HeartbeatTCP) keepaliveManager() {
@@ -135,7 +146,7 @@ func (c *HeartbeatTCP) keepaliveManager() {
 				return
 			}
 			if flag == FlagPing {
-				fmt.Println(c.Conn.LocalAddr(), "PING")
+				// fmt.Println(c.Conn.LocalAddr(), "PING")
 				err := c.keepAliveSender(FlagPong)
 				if errors.Is(err, net.ErrClosed) || errors.Is(err, io.EOF) || errors.Is(err, io.ErrUnexpectedEOF) {
 
@@ -146,7 +157,7 @@ func (c *HeartbeatTCP) keepaliveManager() {
 					return
 				}
 			} else {
-				fmt.Println(c.Conn.LocalAddr(), "PONG")
+				// fmt.Println(c.Conn.LocalAddr(), "PONG")
 			}
 		case <-c.closeCh:
 			c.Close()

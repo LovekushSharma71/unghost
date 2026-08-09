@@ -2,13 +2,18 @@ package unghost
 
 import (
 	"errors"
-	"fmt"
 	"net"
 	"sync"
 	"time"
 )
 
-//TODO: add flow control in this code to add reduce infinite spong for this and reduce backpressure
+var (
+	ErrConnectionNil     = errors.New("unghost: connection cannot be nil")
+	ErrPacketTooLarge    = errors.New("unghost: protocol violation, packet size exceeds chunk size")
+	ErrInvalidHeartbeat  = errors.New("unghost: keepalive error, cannot send non-heartbeat data")
+	ErrUnknownFlag       = errors.New("unghost: unknown protocol flag received")
+	ErrDeadlinesDisabled = errors.New("unghost: deadlines are managed internally by keep-alive")
+)
 
 var netErr net.Error
 
@@ -60,7 +65,7 @@ type HeartbeatTCP struct {
 func Wrap(c net.Conn, config KeepAliveConfig, maxWindowSize uint32, chunkSize uint32) (*HeartbeatTCP, error) {
 
 	if c == nil {
-		fmt.Println("wrap error: connection cannot be nil")
+		// fmt.Println("wrap error: connection cannot be nil")
 		return nil, errors.New("connection not provided")
 	}
 	if config.KeepAliveInterval == 0 {
@@ -130,8 +135,6 @@ func (c *HeartbeatTCP) Close() error {
 
 	return nil
 }
-
-var ErrDeadlinesDisabled = errors.New("unghost: deadlines are managed internally by keep-alive")
 
 func (c *HeartbeatTCP) SetDeadline(t time.Time) error {
 	return ErrDeadlinesDisabled

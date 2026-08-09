@@ -2,7 +2,6 @@ package unghost
 
 import (
 	"errors"
-	"fmt"
 	"net"
 )
 
@@ -61,7 +60,7 @@ func (c *HeartbeatTCP) Write(b []byte) (int, error) {
 
 	ptr := 0
 
-	maxPayloadSize := int(c.flowControlData.chunkSize) - 9
+	maxPayloadSize := int(c.flowControlData.chunkSize) - HEADERLENGTH
 	for ptr < len(b) {
 
 		c.flowControlData.flowDataLock.Lock()
@@ -111,7 +110,7 @@ func (c *HeartbeatTCP) Write(b []byte) (int, error) {
 
 		if err != nil {
 			if errors.As(err, &netErr) && netErr.Timeout() {
-				fmt.Println("timeout error:", err)
+				// fmt.Println("timeout error:", err)
 				select {
 				case c.closeCh <- struct{}{}:
 				default:
