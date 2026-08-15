@@ -4,16 +4,17 @@ import (
 	"sync"
 )
 
-// will change these constants based on experiments
+// Default constants for flow control windowing.
 const (
 
-	// max window size 2^16-1 for now ie 64kb
+	// ChunkSizeDefault is the default maximum size (64KB) for a single transmitted data chunk.
 	ChunkSizeDefault uint32 = 65535
 
-	// Total window size 2^20-1 for now ie 1mb approx
+	// MaxWindowSize is the default total maximum window size (approx 1MB) for in-flight data.
 	MaxWindowSize uint32 = 1048576
 )
 
+// flowControlData manages credit state and synchronization channels for a connection.
 type flowControlData struct {
 
 	//How much i can send
@@ -33,36 +34,49 @@ type flowControlData struct {
 
 	flowDataLock sync.Mutex
 
-	chunkSize uint32
-
 	maxWindowSize uint32
 }
 
-// sender and reciever will consume a discrete amount of credits no matter how small datalength sent
-//locking and unlocking will be handled where used
-
-// Contains assuming this is always in mutex with send or recive to safely deduct credits.
-// cause i need to check credits before sending and recieving.
-// sender will always consume or free credit
+// consumeCredits deducts credits for an outgoing data chunk.
+//
+// [SPECIFICATION]
+// - INTENT: Reduce the available sendCredits by chunkSize to reflect data being transmitted.
+// - PRECONDITION: Caller MUST hold c.flowControlData.flowDataLock.
+// - POSTCONDITION: If sendCredits >= chunkSize, sendCredits is decremented by chunkSize.
+// - POSTCONDITION: If sendCredits < chunkSize, sendCredits MUST strictly clamp to 0.
+// - INVARIANT: sendCredits MUST NEVER underflow below 0 (wrap around).
 func (c *HeartbeatTCP) consumeCredits() {
 
-	if c.flowControlData.sendCredits >= c.flowControlData.chunkSize {
-		c.flowControlData.sendCredits = c.flowControlData.sendCredits - c.flowControlData.chunkSize
+	if c.flowControlData.sendCredits >= ChunkSizeDefault {
+		c.flowControlData.sendCredits = c.flowControlData.sendCredits - ChunkSizeDefault
 	} else {
 		c.flowControlData.sendCredits = 0
 	}
 
 }
 
-// atomically update window size on getting packet from reciever or when read operation is finished.
+// refundCredits restores available credits after successful transmission or receipt of remote credits.
+//
+// [SPECIFICATION]
+// - INTENT: Increase sendCredits by the provided size, up to the maximum window limit.
+// - PRECONDITION: Caller MUST hold c.flowControlData.flowDataLock.
+// - POSTCONDITION: sendCredits is increased by size.
+// - POSTCONDITION: sendCredits MUST strictly clamp to maxWindowSize.
+// - INVARIANT: sendCredits MUST NEVER exceed maxWindowSize.
 func (c *HeartbeatTCP) refundCredits(size uint32) {
 
 	c.flowControlData.sendCredits = min(c.flowControlData.maxWindowSize, c.flowControlData.sendCredits+size)
 }
 
-// should not logically go above max size
-// will only increase
+// addProcessedCredit increments the tracked read credits that need to be sent back to the remote.
+//
+// [SPECIFICATION]
+// - INTENT: Increase processedCredits by chunkSize to reflect successfully read network data.
+// - PRECONDITION: Caller MUST hold c.flowControlData.flowDataLock.
+// - POSTCONDITION: processedCredits is increased by chunkSize.
+// - POSTCONDITION: processedCredits MUST strictly clamp to maxWindowSize.
+// - INVARIANT: processedCredits MUST NEVER exceed maxWindowSize.
 func (c *HeartbeatTCP) addProcessedCredit() {
 
-	c.flowControlData.processedCredits = min(c.flowControlData.maxWindowSize, c.flowControlData.processedCredits+c.flowControlData.chunkSize)
+	c.flowControlData.processedCredits = min(c.flowControlData.maxWindowSize, c.flowControlData.processedCredits+ChunkSizeDefault)
 }
