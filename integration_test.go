@@ -84,24 +84,19 @@ func assertGoroutineLeak(t *testing.T, baseline int) {
 	t.Errorf("Goroutine leak detected: baseline=%d, current=%d", baseline, current)
 }
 
-// ----------------------------------------------------------------------
-// Phase 1: Core Functionality Tests
-// ----------------------------------------------------------------------
+// Core Functionality Tests
 
 func TestSanity_SimpleMessage(t *testing.T) {
 	t.Log("--- Starting TestSanity_SimpleMessage ---")
 
-	// Initialize Toxiproxy harness FIRST so HTTP client pool goroutines are created
 	_, listener := setupHarness(t)
 
-	// Measure baseline AFTER setupHarness creates background HTTP connections
 	baseline := runtime.NumGoroutine()
 	defer assertGoroutineLeak(t, baseline)
 
 	var wg sync.WaitGroup
 	wg.Add(1)
 
-	// Server
 	go func() {
 		defer wg.Done()
 		t.Log("Server: Waiting for connection...")
@@ -135,7 +130,6 @@ func TestSanity_SimpleMessage(t *testing.T) {
 		serverConn.Write([]byte("Acknowledged"))
 	}()
 
-	// Client
 	t.Log("Client: Dialing proxy...")
 	rawClientConn, err := net.Dial("tcp", clientDialAddr)
 	if err != nil {
@@ -187,7 +181,6 @@ func TestDataIntegrity_100MB(t *testing.T) {
 	var wg sync.WaitGroup
 	wg.Add(1)
 
-	// Server
 	go func() {
 		defer wg.Done()
 		rawConn, err := listener.Accept()
@@ -223,7 +216,6 @@ func TestDataIntegrity_100MB(t *testing.T) {
 		}
 	}()
 
-	// Client
 	rawClientConn, err := net.Dial("tcp", clientDialAddr)
 	if err != nil {
 		t.Fatalf("Client dial failed: %v", err)
@@ -305,9 +297,7 @@ func TestFlowControl_SlowReader(t *testing.T) {
 	wg.Wait()
 }
 
-// ----------------------------------------------------------------------
-// Phase 2: Chaos & Resilience Tests (Toxiproxy)
-// ----------------------------------------------------------------------
+// Chaos & Resilience Tests (Toxiproxy)
 
 func TestChaos_BandwidthThrottlingAndFragmentation(t *testing.T) {
 	t.Log("--- Starting TestChaos_BandwidthThrottlingAndFragmentation ---")
@@ -324,7 +314,6 @@ func TestChaos_BandwidthThrottlingAndFragmentation(t *testing.T) {
 	var wg sync.WaitGroup
 	wg.Add(1)
 
-	// Server
 	go func() {
 		defer wg.Done()
 		rawConn, err := listener.Accept()
@@ -345,7 +334,6 @@ func TestChaos_BandwidthThrottlingAndFragmentation(t *testing.T) {
 		}
 	}()
 
-	// Client
 	rawClientConn, err := net.Dial("tcp", clientDialAddr)
 	if err != nil {
 		t.Fatalf("Client dial failed: %v", err)
@@ -377,7 +365,6 @@ func TestChaos_HighLatencyAndJitter(t *testing.T) {
 	var wg sync.WaitGroup
 	wg.Add(1)
 
-	// Server
 	go func() {
 		defer wg.Done()
 		rawConn, err := listener.Accept()
@@ -400,7 +387,6 @@ func TestChaos_HighLatencyAndJitter(t *testing.T) {
 		serverConn.Read(buf)
 	}()
 
-	// Client
 	rawClientConn, err := net.Dial("tcp", clientDialAddr)
 	if err != nil {
 		t.Fatalf("Client dial failed: %v", err)
@@ -549,9 +535,7 @@ func TestChaos_HardReset(t *testing.T) {
 	wg.Wait()
 }
 
-// ----------------------------------------------------------------------
-// Phase 3: Protocol Error Recovery
-// ----------------------------------------------------------------------
+// Protocol Error Recovery
 
 func TestProtocol_MalformedDataInjection(t *testing.T) {
 	t.Log("--- Starting TestProtocol_MalformedDataInjection ---")
