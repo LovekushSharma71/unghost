@@ -11,6 +11,7 @@ const (
 )
 
 const (
+	// HEADERLENGTH defines the strict 9-byte layout: [1B Flag | 4B Credits | 4B DataLength].
 	HEADERLENGTH int = 9
 )
 
@@ -20,8 +21,12 @@ type tcpReadData struct {
 	err error
 }
 
-// parse header
-// header contains flag|credits|length|data
+// parseHeader extracts the flag, credits, and length from a 9-byte header.
+//
+// [SPECIFICATION]
+// - INTENT: Decode a standardized protocol header according to BigEndian format.
+// - PRECONDITION: buf MUST be exactly HEADERLENGTH (9) bytes long to prevent panics.
+// - POSTCONDITION: Returns (Flag, Credits, Length) accurately mapped from indices.
 func parseHeader(buf []byte) (byte, uint32, uint32) {
 	// will put flag check later with error
 	crd := binary.BigEndian.Uint32(buf[1:5])
@@ -29,6 +34,12 @@ func parseHeader(buf []byte) (byte, uint32, uint32) {
 	return buf[0], crd, len
 }
 
+// putHeader encodes the flag, credits, and length into a 9-byte header.
+//
+// [SPECIFICATION]
+// - INTENT: Encode a standardized protocol header according to BigEndian format.
+// - PRECONDITION: buf MUST be exactly HEADERLENGTH (9) bytes long to prevent panics.
+// - POSTCONDITION: Modifies the target buf array in place.
 func putHeader(flag byte, crd uint32, len uint32, buf []byte) {
 	// will put flag check later with error
 	buf[0] = flag

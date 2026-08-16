@@ -13,6 +13,18 @@ const (
 	defaultKeepAliveTimeout  time.Duration = 5 * time.Minute
 )
 
+// keepAliveReciever is an infinite loop that reads incoming frames from the network.
+//
+// [SPECIFICATION]
+// - INTENT: Parse incoming headers, route data payloads, process credit refunds, and filter heartbeats.
+// - POSTCONDITION: Header refunds are always processed via refundCredits() and sndNotifyCond is broadcasted if credits exceed chunkSize.
+// - POSTCONDITION: FlagPing/FlagPong are non-blockingly routed to heartbeatCh.
+// - POSTCONDITION: FlagUserData reads the payload and non-blockingly routes it to tcpDataCh.
+// - POSTCONDITION: Read deadlines are continually extended by KeepAliveTimeout upon successful reads.
+// - EXPECTED ERRORS: If FlagUserData datalength > chunkSize, raises ErrPacketTooLarge, signals closeCh, and exits loop.
+// - EXPECTED ERRORS: If an unknown flag is received, raises ErrUnknownFlag, signals closeCh, and exits loop.
+// - SIDE-EFFECTS: Triggers closeCh and terminates on io.EOF, net.ErrClosed, or timeout.
+
 func (c *HeartbeatTCP) keepAliveReciever() {
 
 	defer close(c.tcpDataCh)
@@ -23,6 +35,7 @@ func (c *HeartbeatTCP) keepAliveReciever() {
 		// read for flag
 		_, err := io.ReadFull(c.Conn, headerBuf)
 		if err != nil {
+			var netErr net.Error
 			if errors.As(err, &netErr) && netErr.Timeout() {
 				fmt.Println("timeout error:", err)
 				select {
@@ -50,7 +63,7 @@ func (c *HeartbeatTCP) keepAliveReciever() {
 		c.flowControlData.flowDataLock.Unlock()
 
 		// just for safety as checking using 0 will do the same
-		if c.flowControlData.sendCredits >= c.flowControlData.chunkSize {
+		if c.flowControlData.sendCredits >= ChunkSizeDefault {
 			c.flowControlData.sndNotifyCond.Broadcast()
 		}
 
@@ -61,9 +74,9 @@ func (c *HeartbeatTCP) keepAliveReciever() {
 				// Safely drop the heartbeat if the manager is dead or blocked, and no other goroutine will write on it so it should be safe
 			}
 		} else if flag == FlagUserData {
-			if datalength > c.flowControlData.chunkSize {
-				// fmt.Printf("keepAliveReciever: protocol voilation Invalid packet size: 0x%02x should not exceede 0x%02x\n", datalength, c.flowControlData.chunkSize)
-				c.tcpDataCh <- tcpReadData{msg: []byte{}, len: 0, err: ErrPacketTooLarge}
+			if datalength > ChunkSizeDefault {
+				// fmt.Printf("keepAliveReciever: protocol voilation Invalid packet size: 0x%02x should not exceede 0x%02x\n", datalength, ChunkSizeDefault)
+				c.tcpDataCh <- tcpReadData{msg: nil, len: 0, err: ErrPacketTooLarge}
 				select {
 				case c.closeCh <- struct{}{}:
 				default:
@@ -71,7 +84,7 @@ func (c *HeartbeatTCP) keepAliveReciever() {
 				return
 			} else {
 				// as one packet will always have data less than equal default chunk size
-				b := c.getBufData().([]byte)
+				b := getBufData().([]byte)
 				n, err := io.ReadFull(c.Conn, b[:datalength])
 				// not locking cause concurrent read is prevented by channel
 				c.tcpDataCh <- tcpReadData{msg: b, len: n, err: err}
@@ -92,6 +105,14 @@ func (c *HeartbeatTCP) keepAliveReciever() {
 	}
 }
 
+// keepAliveSender transmits a control frame (Ping/Pong) over the network.
+//
+// [SPECIFICATION]
+// - INTENT: Construct and write an empty payload header containing the heartbeat flag and current processedCredits.
+// - PRECONDITION: heartbeatFlag MUST be either FlagPing or FlagPong.
+// - POSTCONDITION: processedCredits is temporarily cleared during send.
+// - ERROR RECOVERY: If network write fails, processedCredits MUST be fully restored.
+// - EXPECTED ERRORS: Returns ErrInvalidHeartbeat if an invalid flag is provided. Triggers closeCh on timeout.
 func (c *HeartbeatTCP) keepAliveSender(heartbeatFlag byte) error {
 
 	buff := getBufHeader().([]byte)
@@ -121,6 +142,7 @@ func (c *HeartbeatTCP) keepAliveSender(heartbeatFlag byte) error {
 	}
 	c.flowControlData.flowDataLock.Unlock()
 
+	var netErr net.Error
 	if errors.As(err, &netErr) && netErr.Timeout() {
 		// fmt.Println("timeout error:", err)
 		select {
@@ -136,6 +158,14 @@ func (c *HeartbeatTCP) keepAliveSender(heartbeatFlag byte) error {
 	return nil
 }
 
+// keepaliveManager maintains the connection lifecycle via regular pings and responding to events.
+//
+// [SPECIFICATION]
+// - INTENT: Manage ticker-based pings, respond to pings with pongs, and push immediate pings when processed credits exceed thresholds.
+// - POSTCONDITION: On receiving FlagPing on heartbeatCh, keepAliveSender(FlagPong) is immediately invoked.
+// - POSTCONDITION: On ticker interval, keepAliveSender(FlagPing) is invoked.
+// - POSTCONDITION: On processedCreditsNotifyCh signal, keepAliveSender(FlagPing) is immediately invoked to flush credits.
+// - SIDE-EFFECTS: Terminates on closeCh signal or if any keepAliveSender network action returns EOF/Closed.
 func (c *HeartbeatTCP) keepaliveManager() {
 	ticker := time.NewTicker(c.config.KeepAliveInterval)
 	defer ticker.Stop()

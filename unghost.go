@@ -15,8 +15,6 @@ var (
 	ErrDeadlinesDisabled = errors.New("unghost: deadlines are managed internally by keep-alive")
 )
 
-var netErr net.Error
-
 type KeepAliveConfig struct {
 
 	// KeepAliveInterval is how often to send a heartbeat to the remote
@@ -33,40 +31,39 @@ type HeartbeatTCP struct {
 
 	config KeepAliveConfig
 
-	//flow control
 	flowControlData flowControlData
 
-	//read lock
 	tcpReadLock sync.Mutex
 
-	// tcp data channel
-	// should make it buffered
 	tcpDataCh chan tcpReadData
 
-	// leftover tcp read data
 	tcpLeftOverData []byte
 
-	// putting interface rn will put proper stuff later
 	heartbeatCh chan byte
 
 	// use to close channel safely to check if session is closed
 	closeOnce sync.Once
 
-	// send close signal to all go routines using this session
+	// send close signal
 	closeCh chan struct{}
 
-	// rn using general lock but for better readability will make is more specific in future like close lock or ping pong lock can also have sync atomic based on need
 	writeLock sync.Mutex
-
-	// sync pool for each connection
-	datapool *sync.Pool
 }
 
-func Wrap(c net.Conn, config KeepAliveConfig, maxWindowSize uint32, chunkSize uint32) (*HeartbeatTCP, error) {
+// Wrap initializes a raw net.Conn with the HeartbeatTCP framework.
+//
+// [SPECIFICATION]
+// - INTENT: Initialize all necessary channels, pools, locks, and background goroutines for the wrapper session.
+// - PRECONDITION: c MUST NOT be nil.
+// - POSTCONDITION: If config values are 0, they strictly fall back to defaultKeepAliveInterval and defaultKeepAliveTimeout.
+// - POSTCONDITION: If window sizes are 0, they strictly fall back to MaxWindowSize and ChunkSizeDefault.
+// - POSTCONDITION: Starts exactly two background routines: keepAliveReciever and keepaliveManager.
+// - EXPECTED ERRORS: Returns non-nil error if input net.Conn is nil.
+func Wrap(c net.Conn, config KeepAliveConfig, maxWindowSize uint32) (*HeartbeatTCP, error) {
 
 	if c == nil {
 		// fmt.Println("wrap error: connection cannot be nil")
-		return nil, errors.New("connection not provided")
+		return nil, ErrConnectionNil
 	}
 	if config.KeepAliveInterval == 0 {
 		config.KeepAliveInterval = defaultKeepAliveInterval
@@ -77,15 +74,6 @@ func Wrap(c net.Conn, config KeepAliveConfig, maxWindowSize uint32, chunkSize ui
 
 	if maxWindowSize == 0 {
 		maxWindowSize = MaxWindowSize
-	}
-	if chunkSize == 0 {
-		chunkSize = ChunkSizeDefault
-	}
-
-	var syncpool = sync.Pool{
-		New: func() any {
-			return make([]byte, chunkSize)
-		},
 	}
 
 	htc := HeartbeatTCP{
@@ -99,16 +87,14 @@ func Wrap(c net.Conn, config KeepAliveConfig, maxWindowSize uint32, chunkSize ui
 			processedCredits:         0,
 			processedCreditsNotifyCh: make(chan struct{}, 1),
 			flowDataLock:             sync.Mutex{},
-			chunkSize:                chunkSize,
 			maxWindowSize:            maxWindowSize,
 		},
 		tcpReadLock:     sync.Mutex{},
-		tcpLeftOverData: make([]byte, 0, maxWindowSize),
-		tcpDataCh:       make(chan tcpReadData, 1024),
-		heartbeatCh:     make(chan byte),
+		tcpLeftOverData: make([]byte, 0, 4096),
+		tcpDataCh:       make(chan tcpReadData, 32),
+		heartbeatCh:     make(chan byte, 1),
 		closeCh:         make(chan struct{}, 1),
 		writeLock:       sync.Mutex{},
-		datapool:        &syncpool,
 	}
 
 	htc.flowControlData.sndNotifyCond = sync.NewCond(&htc.flowControlData.flowDataLock)
@@ -120,7 +106,13 @@ func Wrap(c net.Conn, config KeepAliveConfig, maxWindowSize uint32, chunkSize ui
 	return &htc, nil
 }
 
-// add sync once for better logic
+// Close gracefully terminates the connection and unlocks all waiting routines.
+//
+// [SPECIFICATION]
+// - INTENT: Ensure idempotent teardown of the connection state.
+// - POSTCONDITION: Safely sets flowControlData.isClosed to true and triggers underlying net.Conn.Close().
+// - POSTCONDITION: Broadcasts sndNotifyCond to prevent writer goroutine deadlocks.
+// - INVARIANT: Can be called concurrently without data races due to sync.Once.
 func (c *HeartbeatTCP) Close() error {
 
 	c.closeOnce.Do(func() {
@@ -136,14 +128,29 @@ func (c *HeartbeatTCP) Close() error {
 	return nil
 }
 
+// SetDeadline overrides standard deadline behaviour as it conflicts with keepalive.
+//
+// [SPECIFICATION]
+// - INTENT: Prevent caller from corrupting internal connection timeouts.
+// - EXPECTED ERRORS: Always returns ErrDeadlinesDisabled.
 func (c *HeartbeatTCP) SetDeadline(t time.Time) error {
 	return ErrDeadlinesDisabled
 }
 
+// SetReadDeadline overrides standard deadline behaviour as it conflicts with keepalive.
+//
+// [SPECIFICATION]
+// - INTENT: Prevent caller from corrupting internal connection timeouts.
+// - EXPECTED ERRORS: Always returns ErrDeadlinesDisabled.
 func (c *HeartbeatTCP) SetReadDeadline(t time.Time) error {
 	return ErrDeadlinesDisabled
 }
 
+// SetWriteDeadline overrides standard deadline behaviour as it conflicts with keepalive.
+//
+// [SPECIFICATION]
+// - INTENT: Prevent caller from corrupting internal connection timeouts.
+// - EXPECTED ERRORS: Always returns ErrDeadlinesDisabled.
 func (c *HeartbeatTCP) SetWriteDeadline(t time.Time) error {
 	return ErrDeadlinesDisabled
 }
