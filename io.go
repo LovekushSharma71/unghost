@@ -5,6 +5,17 @@ import (
 	"net"
 )
 
+// Read reads data from the network connection into the provided buffer.
+//
+// [SPECIFICATION]
+// - INTENT: Fulfill standard io.Reader contract by draining tcpLeftOverData first, then tcpDataCh.
+// - PRECONDITION: Connection must be wrapped and initialized.
+// - POSTCONDITION: If tcpLeftOverData > 0, reads entirely from leftover without blocking on channel.
+// - POSTCONDITION: If read from channel is larger than len(b), excess bytes MUST be appended to tcpLeftOverData.
+// - POSTCONDITION: processedCredits is incremented via addProcessedCredit().
+// - NOTIFICATION: If processedCredits >= 25% of maxWindowSize, a non-blocking signal MUST be sent to processedCreditsNotifyCh.
+// - EXPECTED ERRORS: Returns net.ErrClosed if tcpDataCh is closed.
+// - EXPECTED ERRORS: Returns standard net.Conn errors.
 func (c *HeartbeatTCP) Read(b []byte) (int, error) {
 
 	// If we have leftovers from a previous read, use them first
@@ -12,7 +23,9 @@ func (c *HeartbeatTCP) Read(b []byte) (int, error) {
 	if len(c.tcpLeftOverData) > 0 {
 
 		copiedCount := copy(b, c.tcpLeftOverData)
-		c.tcpLeftOverData = c.tcpLeftOverData[copiedCount:]
+		// to reduce length and capacity
+		remaining := copy(c.tcpLeftOverData, c.tcpLeftOverData[copiedCount:])
+		c.tcpLeftOverData = c.tcpLeftOverData[:remaining]
 		c.tcpReadLock.Unlock()
 		return copiedCount, nil
 	}
@@ -36,9 +49,10 @@ func (c *HeartbeatTCP) Read(b []byte) (int, error) {
 
 	c.flowControlData.flowDataLock.Lock()
 	c.addProcessedCredit()
+	isAboveThrushhold := float64(c.flowControlData.processedCredits) >= 0.25*float64(c.flowControlData.maxWindowSize)
 	c.flowControlData.flowDataLock.Unlock()
 
-	if float64(c.flowControlData.processedCredits) >= 0.25*float64(c.flowControlData.maxWindowSize) {
+	if isAboveThrushhold {
 		select {
 		case c.flowControlData.processedCreditsNotifyCh <- struct{}{}:
 		default:
@@ -47,20 +61,32 @@ func (c *HeartbeatTCP) Read(b []byte) (int, error) {
 	}
 
 	if tcpMsg.msg != nil {
-		c.putBufData(tcpMsg.msg)
+		putBufData(tcpMsg.msg)
 	}
 	return copiedCount, tcpMsg.err
 
 }
 
+// Write writes the provided buffer to the network connection over multiple chunked frames.
+//
+// [SPECIFICATION]
+// - INTENT: Fulfill standard io.Writer contract while respecting maxPayloadSize and sendCredits flow control.
+// - POSTCONDITION: Blocks via sndNotifyCond.Wait() if sendCredits == 0 until remote refunds credits.
+// - POSTCONDITION: Slices data into chunks not exceeding maxPayloadSize or current sendCredits.
+// - POSTCONDITION: Consumes credits prior to writing and packages processedCredits into the outgoing header.
+// - ERROR RECOVERY: If network Write fails, consumed credits MUST be refunded and processedCredits MUST be restored.
+// - EXPECTED ERRORS: Returns net.ErrClosed immediately if flowControlData.isClosed is true. Triggers closeCh on net.Error timeout.
+// - EXPECTED ERRORS: Returns standard net.Conn.
 func (c *HeartbeatTCP) Write(b []byte) (int, error) {
 
 	c.streamLock.Lock()
 	defer c.streamLock.Unlock()
 
 	ptr := 0
+	frameBuf := getBufData().([]byte)
+	defer putBufData(frameBuf)
 
-	maxPayloadSize := int(c.flowControlData.chunkSize) - HEADERLENGTH
+	maxPayloadSize := int(ChunkSizeDefault) - HEADERLENGTH
 	for ptr < len(b) {
 
 		c.flowControlData.flowDataLock.Lock()
@@ -75,40 +101,47 @@ func (c *HeartbeatTCP) Write(b []byte) (int, error) {
 
 		c.flowControlData.flowDataLock.Unlock()
 
-		header := syncpoolHeader.Get().([]byte)
-		var buff net.Buffers
+		// header := syncpoolHeader.Get().([]byte)
+
 		// prepare payload
 		chunkSize := len(b) - ptr
 		if chunkSize > maxPayloadSize {
 			chunkSize = maxPayloadSize
 		}
+		c.flowControlData.flowDataLock.Lock()
 		if chunkSize > int(c.flowControlData.sendCredits) {
 			chunkSize = int(c.flowControlData.sendCredits)
 		}
-
-		c.flowControlData.flowDataLock.Lock()
 		creditsSent := c.flowControlData.processedCredits
 		c.flowControlData.processedCredits = 0
 		c.consumeCredits()
 
-		putHeader(FlagUserData, creditsSent, uint32(chunkSize), header)
-		buff = net.Buffers{header, b[ptr : ptr+chunkSize]}
+		putHeader(FlagUserData, creditsSent, uint32(chunkSize), frameBuf[:HEADERLENGTH])
 		c.flowControlData.flowDataLock.Unlock()
 
+		copy(frameBuf[HEADERLENGTH:], b[ptr:ptr+chunkSize])
+
 		c.writeLock.Lock()
-		_, err := buff.WriteTo(c.Conn)
+		// _, err := c.Conn.Write(header)
+		// if err == nil {
+		// 	_, err = c.Conn.Write(b[ptr : ptr+chunkSize])
+		// }
+		// bufs := net.Buffers{header, b[ptr : ptr+chunkSize]}
+		// _, err := bufs.WriteTo(c.Conn)
+		_, err := c.Conn.Write(frameBuf[:HEADERLENGTH+chunkSize])
 		c.writeLock.Unlock()
 
 		c.flowControlData.flowDataLock.Lock()
 		if err != nil {
 
-			c.refundCredits(c.flowControlData.chunkSize)
-			c.flowControlData.processedCredits += c.flowControlData.chunkSize
+			c.refundCredits(ChunkSizeDefault)
+			c.flowControlData.processedCredits += ChunkSizeDefault
 		}
 		c.flowControlData.flowDataLock.Unlock()
-		syncpoolHeader.Put(header)
+		// syncpoolHeader.Put(header)
 
 		if err != nil {
+			var netErr net.Error
 			if errors.As(err, &netErr) && netErr.Timeout() {
 				// fmt.Println("timeout error:", err)
 				select {
