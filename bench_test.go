@@ -92,7 +92,6 @@ func benchmarkThroughput(b *testing.B, chunkSize int) {
 
 	done := make(chan struct{})
 
-	// Continuous reader loop
 	go func() {
 		for i := 0; i < b.N; i++ {
 			if _, err := io.ReadFull(htcServer, readBuf); err != nil {
@@ -102,7 +101,6 @@ func benchmarkThroughput(b *testing.B, chunkSize int) {
 		close(done)
 	}()
 
-	// Continuous writer loop
 	for i := 0; i < b.N; i++ {
 		if _, err := htcClient.Write(payload); err != nil {
 			b.Fatalf("Write failed: %v", err)
