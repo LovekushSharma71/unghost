@@ -7,7 +7,28 @@ import (
 	"sync"
 	"testing"
 	"time"
+
+	"go.uber.org/goleak"
 )
+
+func TestWrap_NoGoroutineLeak(t *testing.T) {
+	// goleak belongs in unit tests, not benchmarks
+	defer goleak.VerifyNone(t)
+
+	server, client := net.Pipe()
+	defer server.Close()
+	defer client.Close()
+
+	htc, err := Wrap(client, KeepAliveConfig{}, 0)
+	if err != nil {
+		t.Fatalf("Wrap failed: %v", err)
+	}
+
+	// Close the wrapper and ensure background routines clean up
+	if err := htc.Close(); err != nil {
+		t.Fatalf("Close failed: %v", err)
+	}
+}
 
 func TestWrap(t *testing.T) {
 	t.Run("Edge case: nil connection returns ErrConnectionNil", func(t *testing.T) {

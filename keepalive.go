@@ -37,7 +37,6 @@ func (c *HeartbeatTCP) keepAliveReciever() {
 		if err != nil {
 			var netErr net.Error
 			if errors.As(err, &netErr) && netErr.Timeout() {
-				fmt.Println("timeout error:", err)
 				select {
 				case c.closeCh <- struct{}{}:
 				default:
@@ -52,7 +51,12 @@ func (c *HeartbeatTCP) keepAliveReciever() {
 				break
 			}
 
-			c.tcpDataCh <- tcpReadData{err: err}
+			select {
+			case c.tcpDataCh <- tcpReadData{err: err}:
+			case <-c.isClosedCh:
+				return
+			}
+
 			continue
 		}
 
@@ -76,7 +80,11 @@ func (c *HeartbeatTCP) keepAliveReciever() {
 		} else if flag == FlagUserData {
 			if datalength > ChunkSizeDefault {
 				// fmt.Printf("keepAliveReciever: protocol voilation Invalid packet size: 0x%02x should not exceede 0x%02x\n", datalength, ChunkSizeDefault)
-				c.tcpDataCh <- tcpReadData{msg: nil, len: 0, err: ErrPacketTooLarge}
+				select {
+				case c.tcpDataCh <- tcpReadData{msg: nil, len: 0, err: ErrPacketTooLarge}:
+				case <-c.isClosedCh:
+				}
+				// c.tcpDataCh <- tcpReadData{msg: nil, len: 0, err: ErrPacketTooLarge}
 				select {
 				case c.closeCh <- struct{}{}:
 				default:
@@ -87,11 +95,24 @@ func (c *HeartbeatTCP) keepAliveReciever() {
 				b := getBufData().([]byte)
 				n, err := io.ReadFull(c.Conn, b[:datalength])
 				// not locking cause concurrent read is prevented by channel
-				c.tcpDataCh <- tcpReadData{msg: b, len: n, err: err}
+				select {
+				case c.tcpDataCh <- tcpReadData{msg: b, len: n, err: err}:
+				case <-c.isClosedCh:
+					// If we were allocated a buffer 'b', make sure to return it to the pool if we abort!
+					if b != nil {
+						putBufData(b)
+					}
+					return
+				}
 			}
 		} else {
 			//close connection due to safety
-			c.tcpDataCh <- tcpReadData{err: fmt.Errorf("%w: 0x%02x", ErrUnknownFlag, flag)}
+			select {
+			case c.tcpDataCh <- tcpReadData{err: fmt.Errorf("%w: 0x%02x", ErrUnknownFlag, flag)}:
+			case <-c.isClosedCh:
+				return
+			}
+
 			// fmt.Printf("keepAliveReciever: Unknown flag: 0x%02x\n", flag)
 			select {
 			case c.closeCh <- struct{}{}:
@@ -213,6 +234,8 @@ func (c *HeartbeatTCP) keepaliveManager() {
 				}
 				return
 			}
+		case <-c.isClosedCh:
+			return
 		}
 	}
 }

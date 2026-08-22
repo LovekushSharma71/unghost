@@ -19,7 +19,7 @@
 
 ```bash
 go get github.com/LovekushSharma71/unghost
-```
+``
 
 ---
 
@@ -34,7 +34,7 @@ import (
 	"log"
 	"net"
 	"time"
-	"github.com/yourusername/unghost"
+	"github.com/LovekushSharma71/unghost"
 )
 
 func main() {

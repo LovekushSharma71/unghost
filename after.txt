@@ -1,0 +1,96 @@
+goos: linux
+goarch: amd64
+pkg: github.com/LovekushSharma71/unghost
+cpu: AMD EPYC 7763 64-Core Processor                
+BenchmarkWrap-2           	  154742	      7564 ns/op	    7324 B/op	      18 allocs/op
+BenchmarkWrap-2           	  180451	      9784 ns/op	    7360 B/op	      18 allocs/op
+BenchmarkWrap-2           	  155008	     10610 ns/op	    7326 B/op	      18 allocs/op
+BenchmarkWrap-2           	  149786	     10577 ns/op	    7318 B/op	      18 allocs/op
+BenchmarkWrap-2           	  149089	      9853 ns/op	    7358 B/op	      18 allocs/op
+BenchmarkWrap-2           	  154276	     10344 ns/op	    7398 B/op	      18 allocs/op
+BenchmarkWrap-2           	  143641	     10738 ns/op	    7480 B/op	      18 allocs/op
+BenchmarkWrap-2           	  153792	     10850 ns/op	    7167 B/op	      18 allocs/op
+BenchmarkWrap-2           	  149636	     11599 ns/op	    7536 B/op	      18 allocs/op
+BenchmarkWrap-2           	  149143	      9609 ns/op	    7161 B/op	      18 allocs/op
+BenchmarkReadWrite4K-2    	   56836	     19086 ns/op	 214.60 MB/s	      60 B/op	       2 allocs/op
+BenchmarkReadWrite4K-2    	   54355	     19871 ns/op	 206.13 MB/s	      60 B/op	       2 allocs/op
+BenchmarkReadWrite4K-2    	   62446	     18475 ns/op	 221.71 MB/s	      59 B/op	       2 allocs/op
+BenchmarkReadWrite4K-2    	   59923	     21237 ns/op	 192.87 MB/s	      59 B/op	       2 allocs/op
+BenchmarkReadWrite4K-2    	   57999	     20615 ns/op	 198.69 MB/s	      60 B/op	       2 allocs/op
+BenchmarkReadWrite4K-2    	   67496	     21303 ns/op	 192.27 MB/s	      61 B/op	       2 allocs/op
+BenchmarkReadWrite4K-2    	   63876	     19169 ns/op	 213.68 MB/s	      59 B/op	       2 allocs/op
+BenchmarkReadWrite4K-2    	   58220	     17993 ns/op	 227.64 MB/s	      60 B/op	       2 allocs/op
+BenchmarkReadWrite4K-2    	   66303	     18149 ns/op	 225.68 MB/s	      59 B/op	       2 allocs/op
+BenchmarkReadWrite4K-2    	   69492	     18463 ns/op	 221.85 MB/s	      59 B/op	       2 allocs/op
+BenchmarkReadWrite64K-2   	   19904	     63833 ns/op	1026.68 MB/s	      97 B/op	       4 allocs/op
+BenchmarkReadWrite64K-2   	   19712	     59686 ns/op	1098.01 MB/s	      94 B/op	       4 allocs/op
+BenchmarkReadWrite64K-2   	   19716	     60703 ns/op	1079.62 MB/s	      94 B/op	       4 allocs/op
+BenchmarkReadWrite64K-2   	   20235	     65881 ns/op	 994.76 MB/s	      94 B/op	       4 allocs/op
+BenchmarkReadWrite64K-2   	   21596	     61835 ns/op	1059.85 MB/s	      97 B/op	       4 allocs/op
+BenchmarkReadWrite64K-2   	   19398	     70899 ns/op	 924.35 MB/s	      93 B/op	       4 allocs/op
+BenchmarkReadWrite64K-2   	   16971	     59266 ns/op	1105.80 MB/s	      94 B/op	       4 allocs/op
+BenchmarkReadWrite64K-2   	   17220	     67528 ns/op	 970.51 MB/s	      97 B/op	       4 allocs/op
+BenchmarkReadWrite64K-2   	   19903	     63216 ns/op	1036.70 MB/s	      94 B/op	       4 allocs/op
+BenchmarkReadWrite64K-2   	   19855	     57928 ns/op	1131.33 MB/s	      94 B/op	       4 allocs/op
+BenchmarkReadWrite1MB-2   	    1399	    906242 ns/op	1157.06 MB/s	     685 B/op	      28 allocs/op
+BenchmarkReadWrite1MB-2   	    1401	    958355 ns/op	1094.14 MB/s	     689 B/op	      28 allocs/op
+BenchmarkReadWrite1MB-2   	    1383	    875810 ns/op	1197.26 MB/s	     638 B/op	      28 allocs/op
+BenchmarkReadWrite1MB-2   	    1531	    939609 ns/op	1115.97 MB/s	     639 B/op	      28 allocs/op
+BenchmarkReadWrite1MB-2   	    1203	    866177 ns/op	1210.58 MB/s	     643 B/op	      28 allocs/op
+BenchmarkReadWrite1MB-2   	    1453	    951937 ns/op	1101.52 MB/s	     637 B/op	      28 allocs/op
+BenchmarkReadWrite1MB-2   	    1154	    883957 ns/op	1186.23 MB/s	     697 B/op	      28 allocs/op
+BenchmarkReadWrite1MB-2   	    1417	    868252 ns/op	1207.69 MB/s	     637 B/op	      28 allocs/op
+BenchmarkReadWrite1MB-2   	    1531	    856612 ns/op	1224.10 MB/s	     636 B/op	      28 allocs/op
+BenchmarkReadWrite1MB-2   	    1310	    874660 ns/op	1198.84 MB/s	     688 B/op	      28 allocs/op
+BenchmarkReadWrite2MB-2   	     684	   1908371 ns/op	1098.92 MB/s	    1227 B/op	      54 allocs/op
+BenchmarkReadWrite2MB-2   	     630	   2132360 ns/op	 983.49 MB/s	    1220 B/op	      53 allocs/op
+BenchmarkReadWrite2MB-2   	     584	   1817216 ns/op	1154.05 MB/s	    1212 B/op	      53 allocs/op
+BenchmarkReadWrite2MB-2   	     537	   1878513 ns/op	1116.39 MB/s	    1217 B/op	      53 allocs/op
+BenchmarkReadWrite2MB-2   	     691	   1803668 ns/op	1162.72 MB/s	    1225 B/op	      54 allocs/op
+BenchmarkReadWrite2MB-2   	     658	   1936067 ns/op	1083.20 MB/s	    1210 B/op	      53 allocs/op
+BenchmarkReadWrite2MB-2   	     692	   2087892 ns/op	1004.44 MB/s	    1213 B/op	      53 allocs/op
+BenchmarkReadWrite2MB-2   	     660	   1825183 ns/op	1149.01 MB/s	    1228 B/op	      53 allocs/op
+BenchmarkReadWrite2MB-2   	     633	   1813221 ns/op	1156.59 MB/s	    1321 B/op	      53 allocs/op
+BenchmarkReadWrite2MB-2   	     602	   2141792 ns/op	 979.16 MB/s	    1232 B/op	      54 allocs/op
+BenchmarkRawTCP4K-2       	  130294	      8126 ns/op	 504.03 MB/s	       0 B/op	       0 allocs/op
+BenchmarkRawTCP4K-2       	  155280	      8298 ns/op	 493.62 MB/s	       0 B/op	       0 allocs/op
+BenchmarkRawTCP4K-2       	  138196	      7511 ns/op	 545.31 MB/s	       0 B/op	       0 allocs/op
+BenchmarkRawTCP4K-2       	  154639	      8203 ns/op	 499.34 MB/s	       0 B/op	       0 allocs/op
+BenchmarkRawTCP4K-2       	  160998	     11545 ns/op	 354.77 MB/s	       0 B/op	       0 allocs/op
+BenchmarkRawTCP4K-2       	  183211	      8113 ns/op	 504.88 MB/s	       0 B/op	       0 allocs/op
+BenchmarkRawTCP4K-2       	  144324	      7592 ns/op	 539.53 MB/s	       0 B/op	       0 allocs/op
+BenchmarkRawTCP4K-2       	  181726	      7590 ns/op	 539.63 MB/s	       0 B/op	       0 allocs/op
+BenchmarkRawTCP4K-2       	  140382	      8096 ns/op	 505.96 MB/s	       0 B/op	       0 allocs/op
+BenchmarkRawTCP4K-2       	  187179	     11611 ns/op	 352.77 MB/s	       0 B/op	       0 allocs/op
+BenchmarkRawTCP64K-2      	   42816	     26565 ns/op	2467.04 MB/s	       0 B/op	       0 allocs/op
+BenchmarkRawTCP64K-2      	   49183	     27008 ns/op	2426.53 MB/s	       0 B/op	       0 allocs/op
+BenchmarkRawTCP64K-2      	   39369	     29966 ns/op	2187.02 MB/s	       0 B/op	       0 allocs/op
+BenchmarkRawTCP64K-2      	   40651	     28126 ns/op	2330.11 MB/s	       0 B/op	       0 allocs/op
+BenchmarkRawTCP64K-2      	   45418	     30165 ns/op	2172.58 MB/s	       0 B/op	       0 allocs/op
+BenchmarkRawTCP64K-2      	   47430	     33631 ns/op	1948.69 MB/s	       0 B/op	       0 allocs/op
+BenchmarkRawTCP64K-2      	   53274	     25641 ns/op	2555.90 MB/s	       0 B/op	       0 allocs/op
+BenchmarkRawTCP64K-2      	   44257	     27631 ns/op	2371.87 MB/s	       0 B/op	       0 allocs/op
+BenchmarkRawTCP64K-2      	   44205	     24533 ns/op	2671.35 MB/s	       0 B/op	       0 allocs/op
+BenchmarkRawTCP64K-2      	   44490	     31881 ns/op	2055.62 MB/s	       0 B/op	       0 allocs/op
+BenchmarkRawTCP1MB-2      	    4357	    280652 ns/op	3736.21 MB/s	       0 B/op	       0 allocs/op
+BenchmarkRawTCP1MB-2      	    3388	    302318 ns/op	3468.46 MB/s	       0 B/op	       0 allocs/op
+BenchmarkRawTCP1MB-2      	    4336	    298039 ns/op	3518.25 MB/s	       0 B/op	       0 allocs/op
+BenchmarkRawTCP1MB-2      	    4398	    300280 ns/op	3491.99 MB/s	       0 B/op	       0 allocs/op
+BenchmarkRawTCP1MB-2      	    4147	    273847 ns/op	3829.06 MB/s	       0 B/op	       0 allocs/op
+BenchmarkRawTCP1MB-2      	    4497	    280258 ns/op	3741.46 MB/s	       0 B/op	       0 allocs/op
+BenchmarkRawTCP1MB-2      	    3897	    301595 ns/op	3476.77 MB/s	       0 B/op	       0 allocs/op
+BenchmarkRawTCP1MB-2      	    4045	    297766 ns/op	3521.48 MB/s	       0 B/op	       0 allocs/op
+BenchmarkRawTCP1MB-2      	    3681	    356612 ns/op	2940.38 MB/s	       0 B/op	       0 allocs/op
+BenchmarkRawTCP1MB-2      	    4154	    303415 ns/op	3455.91 MB/s	       0 B/op	       0 allocs/op
+BenchmarkRawTCP2MB-2      	    2230	    553043 ns/op	3792.03 MB/s	       0 B/op	       0 allocs/op
+BenchmarkRawTCP2MB-2      	    2205	    548123 ns/op	3826.06 MB/s	       0 B/op	       0 allocs/op
+BenchmarkRawTCP2MB-2      	    2239	    538752 ns/op	3892.61 MB/s	       0 B/op	       0 allocs/op
+BenchmarkRawTCP2MB-2      	    2073	    583015 ns/op	3597.08 MB/s	       0 B/op	       0 allocs/op
+BenchmarkRawTCP2MB-2      	    2031	    552405 ns/op	3796.40 MB/s	       0 B/op	       0 allocs/op
+BenchmarkRawTCP2MB-2      	    2282	    510090 ns/op	4111.33 MB/s	       0 B/op	       0 allocs/op
+BenchmarkRawTCP2MB-2      	    2238	    529625 ns/op	3959.69 MB/s	       0 B/op	       0 allocs/op
+BenchmarkRawTCP2MB-2      	    2085	    556459 ns/op	3768.75 MB/s	       0 B/op	       0 allocs/op
+BenchmarkRawTCP2MB-2      	    2229	    654215 ns/op	3205.60 MB/s	       0 B/op	       0 allocs/op
+BenchmarkRawTCP2MB-2      	    2107	    564094 ns/op	3717.73 MB/s	       0 B/op	       0 allocs/op
+PASS
+ok  	github.com/LovekushSharma71/unghost	484.220s

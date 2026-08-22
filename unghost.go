@@ -47,6 +47,8 @@ type HeartbeatTCP struct {
 	// send close signal
 	closeCh chan struct{}
 
+	isClosedCh chan struct{}
+
 	writeLock sync.Mutex
 }
 
@@ -95,6 +97,7 @@ func Wrap(c net.Conn, config KeepAliveConfig, maxWindowSize uint32) (*HeartbeatT
 		heartbeatCh:     make(chan byte, 1),
 		closeCh:         make(chan struct{}, 1),
 		writeLock:       sync.Mutex{},
+		isClosedCh:      make(chan struct{}),
 	}
 
 	htc.flowControlData.sndNotifyCond = sync.NewCond(&htc.flowControlData.flowDataLock)
@@ -118,6 +121,9 @@ func (c *HeartbeatTCP) Close() error {
 	c.closeOnce.Do(func() {
 
 		c.Conn.Close()
+		if c.isClosedCh != nil {
+			close(c.isClosedCh)
+		}
 		c.flowControlData.flowDataLock.Lock()
 		c.flowControlData.isClosed = true
 		c.flowControlData.sndNotifyCond.Broadcast()
